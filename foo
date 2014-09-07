@@ -1,0 +1,160 @@
+#!/usr/bin/env ruby
+#
+# foo <https://github.com/mg6/foo>
+# Easily control your foobar2000 from the command line.
+#
+# Copyright (C) 2014 M. Gamrat. All rights reserved.
+# Released under the terms of GNU GPL v2 license.
+
+require 'net/http'
+require 'thor'
+
+class Foobar2000 < Thor
+  VERSION = '1.0.0'
+
+  class_option :host, :type => :string, :desc => 'Sets target machine address.'
+  class_option :quiet, :type => :boolean, :desc => 'Supresses track titles.'
+
+  desc "stop", "Stops playback."
+  def stop
+    send 'Stop'
+  end
+
+  desc "start", "Starts playback."
+  def start
+    send 'Start'
+    playing true unless options[:quiet]
+  end
+
+  desc "toggle", "Resumes or pauses playback."
+  def toggle
+    send 'PlayOrPause'
+  end
+
+  desc "random", "Starts random track."
+  def random
+    send 'StartRandom'
+    playing true unless options[:quiet]
+  end
+
+  desc "previous", "Starts previous track."
+  def previous
+    send 'StartPrevious'
+    playing true unless options[:quiet]
+  end
+
+  desc "next", "Starts next track."
+  def next
+    send 'StartNext'
+    playing true unless options[:quiet]
+  end
+
+  desc "volume", "Sets playback volume."
+  def volume(vol)
+    send 'Volume', vol.to_i
+  end
+
+  desc "deltavolume", "Changes volume level by given delta."
+  def deltavolume(dv)
+    send 'VolumeDelta', dv
+  end
+
+  desc "dbvolume", "Sets volume level in dB."
+  def dbvolume(db)
+    send 'VolumeDB', db
+  end
+
+  desc "deltadbvolume", "Changes volume level by given delta in dB."
+  def deltadbvolume(ddb)
+    send 'VolumeDBDelta', ddb
+  end
+
+  desc "seek", "Seeks playing item by percent."
+  def seek(p)
+    send 'Seek', p
+  end
+
+  desc "order", "Changes playback order: 0 = default, 1 = repeat playlist, 2 = repeat track, 3 = random, 4 = shuffle tracks, 5 = shuffle albums, 6 = shuffle folders"
+  def order(o)
+    send 'PlaybackOrder', o
+  end
+
+  desc "stopafter", "Changes stop after current flag: 0 = disable, 1 = enable."
+  def stopafter(flag = 1)
+    send 'SAC', flag
+  end
+
+  desc "queuerandom", "Queues random items in active playlist."
+  def queuerandom(count = 5)
+    send 'QueueRandomItems', count
+  end
+
+  desc "flushqueue", "Flashes queue completely."
+  def flushqueue
+    send 'FlushQueue'
+  end
+
+  desc "switch", "Switches playlist to given index."
+  def switch(index)
+    send 'SwitchPlaylist', index
+  end
+
+  desc "focus", "Sets focus on playing playlist."
+  def focus
+    send 'FocusOnPlaying'
+  end
+
+  desc "search", "Searches through media library."
+  def search(query)
+    send 'SearchMediaLibrary', query
+  end
+
+  desc "parse", "Parses specified string."
+  def parse(str, show = true)
+    res = send 'Parse', str 
+    puts res if show
+    res
+  end
+
+  desc "length", "Returns playing item legnth in seconds."
+  def length
+    parse '[ITEM_PLAYING_LEN]'
+  end
+
+  desc "position", "Returns playing item position in seconds."
+  def position
+    parse '[ITEM_PLAYING_POS]'
+  end
+
+  desc "playing", "Returns playing item title."
+  def playing(wait = nil)
+    sleep 0.3 if wait # allow foobar2000 to refresh the HTTP module
+
+    res = parse '[PLAYLIST]', false
+    exit 1 if res.empty?
+
+    m = res.match(/nowplaying"><td.+?>([^<]+)<\/td>/x)
+    if m && title = m[1]
+      puts title.force_encoding('utf-8')
+    else
+      exit 2
+    end
+  end
+
+  desc "version", "Displays version."
+  def version
+    puts VERSION
+  end
+
+  private
+
+  def send(action, *pars)
+    (options ||= {})[:host] ||= '127.0.0.1:8888'
+
+    pars = pars.each_with_index.map { |par, i| "Param#{i + 1}=#{par}" }.join '&'
+
+    Net::HTTP.get URI("http://#{options[:host]}/default/?cmd=#{action}&#{pars}")
+  end
+end
+
+Foobar2000.start ARGV

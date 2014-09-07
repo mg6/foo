@@ -12,7 +12,7 @@ require 'thor'
 class Foobar2000 < Thor
   VERSION = '1.0.0'
 
-  class_option :host, :type => :string, :desc => 'Sets target machine address.'
+  class_option :host, :type => :string, :desc => 'Sets target machine address.', :default => '127.0.0.1:8888'
   class_option :quiet, :type => :boolean, :desc => 'Supresses track titles.'
 
   desc "stop", "Stops playback."
@@ -131,13 +131,13 @@ class Foobar2000 < Thor
     sleep 0.3 if wait # allow foobar2000 to refresh the HTTP module
 
     res = parse '[PLAYLIST]', false
-    exit 1 if res.empty?
+    exit 2 if res.empty?
 
     m = res.match(/nowplaying"><td.+?>([^<]+)<\/td>/x)
     if m && title = m[1]
       puts title.force_encoding('utf-8')
     else
-      exit 2
+      exit 3
     end
   end
 
@@ -149,11 +149,11 @@ class Foobar2000 < Thor
   private
 
   def send(action, *pars)
-    (options ||= {})[:host] ||= '127.0.0.1:8888'
-
     pars = pars.each_with_index.map { |par, i| "Param#{i + 1}=#{par}" }.join '&'
 
     Net::HTTP.get URI("http://#{options[:host]}/default/?cmd=#{action}&#{pars}")
+  rescue => e
+    exit 1
   end
 end
 
